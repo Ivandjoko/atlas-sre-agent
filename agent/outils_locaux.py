@@ -33,7 +33,8 @@ def verifier_sante(service: str) -> dict:
 
 @tool
 def lire_logs_erreurs(service: str, minutes: int = 15) -> dict:
-    """Résume les erreurs récentes d'un service : nombre, répartition par code d'erreur et exemples.
+    """Résume le trafic récent d'un service : nombre de requêtes, taux d'échec,
+    et causes des échecs regroupées par code d'erreur, avec quelques exemples.
 
     Args:
         service: nom du service, par exemple "api-virements".
@@ -42,7 +43,7 @@ def lire_logs_erreurs(service: str, minutes: int = 15) -> dict:
     conteneur = CONTENEURS.get(service)
     if conteneur is None:
         return {"erreur": f"service inconnu : {service}", "services_connus": list(CONTENEURS)}
-    minutes = max(1, min(minutes, 120))  # on borne ce que le modèle demande
+    minutes = max(1, min(minutes, 120))
     proc = subprocess.run(
         ["docker", "logs", "--since", f"{minutes}m", conteneur],
         capture_output=True, text=True, timeout=10,
@@ -50,20 +51,30 @@ def lire_logs_erreurs(service: str, minutes: int = 15) -> dict:
     if proc.returncode != 0:
         return {"erreur": "logs indisponibles", "detail": proc.stderr.strip()[:300]}
 
-    erreurs = []
+    acces, causes = [], []
     for ligne in (proc.stdout + proc.stderr).splitlines():
         try:
-            evenement = json.loads(ligne)
+            evt = json.loads(ligne)
         except json.JSONDecodeError:
-            continue  # lignes non JSON (messages d'uvicorn) ignorées
-        if evenement.get("level") in ("ERROR", "CRITICAL"):
-            erreurs.append(evenement)
+            continue
+        chemin = evt.get("path", "")
+        if evt.get("message") == "requête traitée":
+            # On exclut les sondes et le chaos : ce n'est pas du trafic client
+            if chemin in ("/health", "/ready") or chemin.startswith("/chaos"):
+                continue
+            acces.append(evt)
+        elif evt.get("error_code"):
+            causes.append(evt)
 
-    codes = Counter(e.get("error_code") or f"HTTP_{e.get('status')}" for e in erreurs)
+    echecs = [e for e in acces if e.get("status", 0) >= 500]
+    taux = round(100 * len(echecs) / len(acces), 1) if acces else 0.0
     return {
         "service": service,
         "fenetre_minutes": minutes,
-        "nb_erreurs": len(erreurs),
-        "par_code": dict(codes),
-        "exemples": erreurs[-3:],  # 3 exemples suffisent : on ne noie pas le modèle
+        "requetes_clients": len(acces),
+        "requetes_en_echec": len(echecs),
+        "taux_echec_pct": taux,
+        "echecs_par_statut": dict(Counter(f"HTTP_{e['status']}" for e in echecs)),
+        "causes_par_code": dict(Counter(e["error_code"] for e in causes)),
+        "exemples_causes": causes[-3:],
     }
