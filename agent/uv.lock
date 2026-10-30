@@ -12,12 +12,14 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
+    { name = "pyyaml" },
     { name = "strands-agents" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "strands-agents", specifier = ">=1.62.0" },
 ]
 

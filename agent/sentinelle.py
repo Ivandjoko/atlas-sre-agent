@@ -1,50 +1,56 @@
 import json
+import os
 import sys
 
 from strands import Agent
 from strands.models import BedrockModel
 
 from outils_locaux import lire_logs_erreurs, verifier_sante
+from skills import catalogue_skills, charger_skill, lire_ressource_skill
 
-SYSTEM_PROMPT = """Tu es Sentinelle, l'agent SRE de la Banque Atlas.
-Ta mission : diagnostiquer les incidents sur les services de la banque.
+MODEL_ID = os.getenv("SENTINELLE_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
 
-Services surveillés : api-virements uniquement.
-Si on te parle d'un autre service, dis qu'il n'est pas surveillé, sans appeler d'outil.
+PROMPT_BASE = """Tu es Sentinelle, l'agent SRE de la Banque Atlas.
+Services surveillés : api-virements uniquement. Si on te parle d'un autre service,
+dis qu'il n'est pas surveillé, sans appeler d'outil.
 
-Méthode :
-- Vérifie la santé du service et ses logs d'erreurs (tu peux le faire en parallèle).
-- Si tu trouves 0 erreur alors qu'un incident est signalé, élargis la fenêtre des logs à 120 minutes avant de conclure.
+Règles permanentes :
 - Appuie chaque affirmation sur un résultat d'outil. N'invente jamais un chiffre ni un service.
+- Tu ne peux rien modifier : tu observes et tu recommandes.
+- Pas de tableau ni d'emoji. Réponds en français.
 
-Réponse finale : uniquement ce bloc, sans tableau, sans emoji, sans répéter le diagnostic :
-Service : ...
-Symptôme : ...
-Cause probable : ...
-Preuves : ...
-Action recommandée : ...
-Tu ne peux rien modifier : tu observes et tu recommandes. Réponds en français."""
+Skills : ce sont les procédures maison de la banque. Le catalogue ci-dessous ne donne
+que leur nom et quand les utiliser. Dès qu'une demande correspond à une skill,
+appelle charger_skill avec son nom AVANT d'agir, puis suis ses instructions.
 
-model = BedrockModel(
-    model_id="eu.anthropic.claude-sonnet-4-6",
-    region_name="eu-central-1",
-    temperature=0.2,
-    max_tokens=2048,
-)
+Catalogue des skills :
+{catalogue}"""
 
-agent = Agent(model=model, system_prompt=SYSTEM_PROMPT, tools=[verifier_sante, lire_logs_erreurs])
 
-question = sys.argv[1] if len(sys.argv) > 1 else "Des clients signalent des échecs de virement. Enquête."
-resultat = agent(question)
+def creer_agent() -> Agent:
+    model = BedrockModel(model_id=MODEL_ID, region_name="eu-central-1", temperature=0.2, max_tokens=4096)
+    return Agent(
+        model=model,
+        system_prompt=PROMPT_BASE.format(catalogue=catalogue_skills()),
+        tools=[verifier_sante, lire_logs_erreurs, charger_skill, lire_ressource_skill],
+    )
 
-# --- Ce qui s'est passé sous le capot -----------------------------------------
-m = resultat.metrics
-print("\n\n=== Bilan ===")
-print("Raison de l'arrêt     :", resultat.stop_reason)
-print("Tours de boucle       :", m.cycle_count)
-print("Outils appelés        :", {nom: t.call_count for nom, t in m.tool_metrics.items()})
-print("Tokens (entrée/sortie) :", m.accumulated_usage)
 
-# Toute la conversation, y compris les demandes d'outils et leurs résultats
-with open("conversation.json", "w") as f:
-    json.dump(agent.messages, f, indent=2, ensure_ascii=False, default=str)
+def afficher_bilan(resultat) -> None:
+    m = resultat.metrics
+    print("\n\n=== Bilan ===")
+    print("Tours de boucle :", m.cycle_count)
+    print("Outils appelés  :", {nom: t.call_count for nom, t in m.tool_metrics.items()})
+    print("Tokens          :", m.accumulated_usage)
+
+
+if __name__ == "__main__":
+    agent = creer_agent()
+    if len(sys.argv) > 1:                      # mode une question
+        afficher_bilan(agent(sys.argv[1]))
+    else:                                      # mode conversation
+        print("Sentinelle prête. Tape 'fin' pour quitter.")
+        while (question := input("\nToi > ").strip()) not in ("", "fin"):
+            afficher_bilan(agent(question))
+    with open("conversation.json", "w") as f:
+        json.dump(agent.messages, f, indent=2, ensure_ascii=False, default=str)
