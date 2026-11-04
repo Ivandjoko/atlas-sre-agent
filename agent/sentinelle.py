@@ -5,7 +5,12 @@ import sys
 from strands import Agent
 from strands.models import BedrockModel
 
-from outils_locaux import lire_logs_erreurs, verifier_sante
+from mcp.client.streamable_http import streamablehttp_client
+from strands.tools.mcp import MCPClient
+
+MCP_OPS_URL = os.getenv("MCP_OPS_URL", "http://127.0.0.1:8000/mcp")
+mcp_ops = MCPClient(lambda: streamablehttp_client(MCP_OPS_URL))
+
 from skills import catalogue_skills, charger_skill, lire_ressource_skill
 
 MODEL_ID = os.getenv("SENTINELLE_MODEL_ID", "eu.anthropic.claude-sonnet-4-6")
@@ -27,12 +32,12 @@ Catalogue des skills :
 {catalogue}"""
 
 
-def creer_agent() -> Agent:
+def creer_agent(outils_mcp: list) -> Agent:
     model = BedrockModel(model_id=MODEL_ID, region_name="eu-central-1", temperature=0.2, max_tokens=4096)
     return Agent(
         model=model,
         system_prompt=PROMPT_BASE.format(catalogue=catalogue_skills()),
-        tools=[verifier_sante, lire_logs_erreurs, charger_skill, lire_ressource_skill],
+        tools=[*outils_mcp, charger_skill, lire_ressource_skill],
     )
 
 
@@ -45,12 +50,15 @@ def afficher_bilan(resultat) -> None:
 
 
 if __name__ == "__main__":
-    agent = creer_agent()
-    if len(sys.argv) > 1:                      # mode une question
-        afficher_bilan(agent(sys.argv[1]))
-    else:                                      # mode conversation
-        print("Sentinelle prête. Tape 'fin' pour quitter.")
-        while (question := input("\nToi > ").strip()) not in ("", "fin"):
-            afficher_bilan(agent(question))
-    with open("conversation.json", "w") as f:
-        json.dump(agent.messages, f, indent=2, ensure_ascii=False, default=str)
+    with mcp_ops:  # ouvre la connexion MCP et la ferme proprement à la fin
+        outils_mcp = mcp_ops.list_tools_sync()
+        print("Outils MCP découverts :", [o.tool_name for o in outils_mcp])
+        agent = creer_agent(outils_mcp)
+        if len(sys.argv) > 1:
+            afficher_bilan(agent(sys.argv[1]))
+        else:
+            print("Sentinelle prête. Tape 'fin' pour quitter.")
+            while (question := input("\nToi > ").strip()) not in ("", "fin"):
+                afficher_bilan(agent(question))
+        with open("conversation.json", "w") as f:
+            json.dump(agent.messages, f, indent=2, ensure_ascii=False, default=str)

@@ -5,7 +5,8 @@ description: Procédure de la Banque Atlas pour enquêter sur un incident de pro
 # Triage d'incident — Banque Atlas
 
 ## Étapes
-1. Mesurer : appeler verifier_sante et lire_logs_erreurs sur le service concerné (en parallèle).
+
+1. Mesurer, en parallèle : verifier_sante, etat_service et lire_logs_erreurs sur le service concerné, et lire la ressource references/matrice-severite.md de cette skill.
    Si 0 requête en échec alors qu'un incident est signalé, relire les logs sur 120 minutes avant de conclure.
 2. Classer la sévérité : lire la ressource references/matrice-severite.md de cette skill
    et l'appliquer au taux d'échec mesuré. Ne jamais classer de mémoire.
