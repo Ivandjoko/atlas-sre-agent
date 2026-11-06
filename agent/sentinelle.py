@@ -5,11 +5,11 @@ import sys
 from strands import Agent
 from strands.models import BedrockModel
 
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 from strands.tools.mcp import MCPClient
 
 MCP_OPS_URL = os.getenv("MCP_OPS_URL", "http://127.0.0.1:8000/mcp")
-mcp_ops = MCPClient(lambda: streamablehttp_client(MCP_OPS_URL))
+mcp_ops = MCPClient(lambda: streamable_http_client(MCP_OPS_URL))
 
 from skills import catalogue_skills, charger_skill, lire_ressource_skill
 
