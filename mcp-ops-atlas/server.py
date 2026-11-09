@@ -6,8 +6,11 @@ from collections import Counter
 
 import boto3
 import httpx
+
 from botocore.exceptions import ClientError
 from mcp.server import MCPServer
+from typing import Annotated
+from pydantic import Field
 
 REGION = "eu-central-1"
 
@@ -58,13 +61,14 @@ def catalogue_services() -> str:
 
 
 # --- Tools : actions que le modèle peut déclencher -----------------------------
-@mcp.tool()
-def verifier_sante(service: str) -> dict:
-    """Vérifie la santé d'un service de la Banque Atlas via ses sondes /health et /ready.
 
-    Args:
-        service: nom du service, par exemple "api-virements".
-    """
+@mcp.tool()
+def verifier_sante(
+    service: Annotated[str, Field(description='Nom du service, par exemple "api-virements".')],
+) -> dict:
+    """Vérifie la santé d'un service de la Banque Atlas via ses sondes /health et /ready."""
+
+
     svc = SERVICES.get(service)
     if svc is None:
         return {"erreur": f"service inconnu : {service}", "services_connus": list(SERVICES)}
@@ -77,14 +81,14 @@ def verifier_sante(service: str) -> dict:
     return resultat
 
 
-@mcp.tool()
-def etat_service(service: str) -> dict:
-    """Donne l'état d'exécution d'un service : en marche ou non, code de sortie,
-    nombre de redémarrages et date de démarrage.
 
-    Args:
-        service: nom du service, par exemple "api-virements".
-    """
+@mcp.tool()
+def etat_service(
+    service: Annotated[str, Field(description='Nom du service, par exemple "api-virements".')],
+) -> dict:
+    """Donne l'état d'exécution d'un service : en marche ou non, code de sortie,
+    nombre de redémarrages et date de démarrage."""
+
     svc = SERVICES.get(service)
     if svc is None:
         return {"erreur": f"service inconnu : {service}", "services_connus": list(SERVICES)}
@@ -112,14 +116,13 @@ REQUETE_INSIGHTS = """fields @message
 
 
 @mcp.tool()
-def lire_logs_erreurs(service: str, minutes: int = 15) -> dict:
+def lire_logs_erreurs(
+    service: Annotated[str, Field(description='Nom du service, par exemple "api-virements".')],
+    minutes: Annotated[int, Field(description="Fenêtre d'analyse en minutes.", ge=1, le=120)] = 15,
+) -> dict:
     """Analyse les logs CloudWatch d'un service : nombre de requêtes clients, taux d'échec,
-    et causes des échecs regroupées par code d'erreur, avec quelques exemples.
+    et causes des échecs regroupées par code d'erreur, avec quelques exemples."""
 
-    Args:
-        service: nom du service, par exemple "api-virements".
-        minutes: fenêtre d'analyse en minutes (entre 1 et 120).
-    """
     svc = SERVICES.get(service)
     if svc is None:
         return {"erreur": f"service inconnu : {service}", "services_connus": list(SERVICES)}
