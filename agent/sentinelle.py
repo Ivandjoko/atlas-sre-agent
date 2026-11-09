@@ -5,11 +5,7 @@ import sys
 from strands import Agent
 from strands.models import BedrockModel
 
-from mcp.client.streamable_http import streamable_http_client
-from strands.tools.mcp import MCPClient
-
-MCP_OPS_URL = os.getenv("MCP_OPS_URL", "http://127.0.0.1:8000/mcp")
-mcp_ops = MCPClient(lambda: streamable_http_client(MCP_OPS_URL))
+from connexions_mcp import client_github, client_ops, client_slack
 
 from skills import catalogue_skills, charger_skill, lire_ressource_skill
 
@@ -21,7 +17,10 @@ dis qu'il n'est pas surveillé, sans appeler d'outil.
 
 Règles permanentes :
 - Appuie chaque affirmation sur un résultat d'outil. N'invente jamais un chiffre ni un service.
-- Tu ne peux rien modifier : tu observes et tu recommandes.
+- Sur les systèmes de la banque, tu ne peux rien modifier : tu observes et tu recommandes.
+- Tes seules actions d'écriture : créer ou commenter une issue dans Ivandjoko/atlas-incidents,
+  et poster dans #incidents, en suivant la skill notification-incident.
+- Si un outil échoue ou est injoignable, dis-le explicitement. Ne présente jamais d'anciens résultats comme actuels.
 - Pas de tableau ni d'emoji. Réponds en français.
 
 Skills : ce sont les procédures maison de la banque. Le catalogue ci-dessous ne donne
@@ -49,10 +48,12 @@ def afficher_bilan(resultat) -> None:
     print("Tokens          :", m.accumulated_usage)
 
 
+
 if __name__ == "__main__":
-    with mcp_ops:  # ouvre la connexion MCP et la ferme proprement à la fin
-        outils_mcp = mcp_ops.list_tools_sync()
-        print("Outils MCP découverts :", [o.tool_name for o in outils_mcp])
+    ops, github, slack = client_ops(), client_github(), client_slack()
+    with ops, github, slack:
+        outils_mcp = [*ops.list_tools_sync(), *github.list_tools_sync(), *slack.list_tools_sync()]
+        print(f"{len(outils_mcp)} outils MCP découverts")
         agent = creer_agent(outils_mcp)
         if len(sys.argv) > 1:
             afficher_bilan(agent(sys.argv[1]))
