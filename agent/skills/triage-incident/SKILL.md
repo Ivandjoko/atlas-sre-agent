@@ -8,6 +8,8 @@ description: Procédure de la Banque Atlas pour enquêter sur un incident de pro
 
 1. Mesurer, en parallèle : verifier_sante, etat_service et lire_logs_erreurs sur le service concerné, et lire la ressource references/matrice-severite.md de cette skill.
    Si 0 requête en échec alors qu'un incident est signalé, relire les logs sur 120 minutes avant de conclure.
+   Les logs CloudWatch arrivent avec un délai de quelques dizaines de secondes. Si l'alarme a moins
+   d'une minute, le signaler dans le diagnostic et préciser que les chiffres peuvent être sous-estimés.
 2. Classer la sévérité : lire la ressource references/matrice-severite.md de cette skill
    et l'appliquer au taux d'échec mesuré. Ne jamais classer de mémoire.
 3. Identifier la cause probable à partir des codes d'erreur connus ci-dessous.
