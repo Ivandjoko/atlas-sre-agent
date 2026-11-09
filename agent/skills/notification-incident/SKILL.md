@@ -21,3 +21,12 @@ Dépôt : Ivandjoko/atlas-incidents. Canal Slack : #incidents (ID C0CCFRQRRJT).
    équipe à prévenir, lien de l'issue. Jamais de logs bruts ni de données client.
 4. Si une étape échoue, le dire clairement. Ne jamais affirmer qu'une notification a été faite si l'outil a échoué.
 5. Terminer par : lien de l'issue (créée ou commentée) et statut du message Slack.
+
+## Cohérence (obligatoire)
+- Si la sévérité change par rapport à l'issue existante : mettre à jour EN MÊME TEMPS le titre ET
+  les labels (retirer l'ancien sevX, ajouter le nouveau), puis ajouter un commentaire
+  "Sévérité modifiée : SEVa -> SEVb, parce que ...".
+- Le titre, le label et le corps doivent toujours indiquer la même sévérité.
+- Séparer l'état actuel de l'historique : si le service est injoignable, c'est le constat principal.
+  Les statistiques de logs passées sont présentées comme "historique (avant la panne)".
+- Un message Slack SEV1 contient toujours la ligne de conformité DORA du diagnostic.
