@@ -6,3 +6,4 @@ __pycache__/
 .terraform/
 *.tfstate*
 agent/conversation.json
+agent/eval_qualite.json

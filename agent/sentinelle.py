@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+import uuid
+from telemetrie import activer_telemetrie
 
 from strands import Agent
 from strands.models import BedrockModel
@@ -31,14 +33,23 @@ Catalogue des skills :
 {catalogue}"""
 
 
-def creer_agent(outils_mcp: list) -> Agent:
+# 2) Nouvelle version de creer_agent : identifiant de session et mode silencieux (pour les tests)
+def creer_agent(outils_mcp: list, silencieux: bool = False, session_id: str | None = None) -> Agent:
     model = BedrockModel(model_id=MODEL_ID, region_name="eu-central-1", temperature=0.2, max_tokens=4096)
+    options = {
+        "trace_attributes": {
+            "session.id": session_id or f"local-{uuid.uuid4().hex[:8]}",
+            "user.id": "ivan",
+        }
+    }
+    if silencieux:
+        options["callback_handler"] = None   # pas d'affichage au fil de l'eau
     return Agent(
         model=model,
         system_prompt=PROMPT_BASE.format(catalogue=catalogue_skills()),
         tools=[*outils_mcp, charger_skill, lire_ressource_skill],
+        **options,
     )
-
 
 def afficher_bilan(resultat) -> None:
     m = resultat.metrics
@@ -50,6 +61,7 @@ def afficher_bilan(resultat) -> None:
 
 
 if __name__ == "__main__":
+    activer_telemetrie()
     ops, github, slack = client_ops(), client_github(), client_slack()
     with ops, github, slack:
         outils_mcp = [*ops.list_tools_sync(), *github.list_tools_sync(), *slack.list_tools_sync()]
