@@ -46,7 +46,7 @@ def creer_agent(outils_mcp: list, silencieux: bool = False, session_id: str | No
         "trace_attributes": {
             "session.id": session_id or f"local-{uuid.uuid4().hex[:8]}",
             "user.id": "ivan",
-        }
+        },
         "hooks": [LimiteurOutils()],
     }
     if silencieux:
