@@ -5,6 +5,10 @@ from strands import tool
 
 from sentinelle import creer_agent
 
+from telemetrie import activer_telemetrie
+
+activer_telemetrie()   # les tests et le juge envoient aussi leurs traces vers Langfuse
+
 SAIN = {"health": 200, "ready": 200}
 INJOIGNABLE = {"health": "injoignable (ConnectError)", "ready": "injoignable (ConnectError)"}
 EN_MARCHE = {"statut": "running", "en_marche": True, "code_sortie": 0, "redemarrages": 0}
