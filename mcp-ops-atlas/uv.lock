@@ -430,6 +430,7 @@ dependencies = [
     { name = "boto3" },
     { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -442,6 +443,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.122" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp", extras = ["cli"], specifier = ">=2.3.0" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]

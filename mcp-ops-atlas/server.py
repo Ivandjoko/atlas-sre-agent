@@ -3,6 +3,8 @@ import json
 import subprocess
 import time
 from collections import Counter
+import hmac
+import os
 
 import boto3
 import httpx
@@ -11,13 +13,20 @@ from botocore.exceptions import ClientError
 from mcp.server import MCPServer
 from typing import Annotated
 from pydantic import Field
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 REGION = "eu-central-1"
+
+API_VIREMENTS_URL = os.getenv("API_VIREMENTS_URL", "http://localhost:8080")
+PLATEFORME = os.getenv("PLATEFORME", "docker")      # "docker" en local, "ecs" sur AWS
+MCP_OPS_TOKEN = os.getenv("MCP_OPS_TOKEN")          # absent = mode local, sans authentification
+
 
 # Catalogue des services surveillés : la seule source de vérité du serveur
 SERVICES = {
     "api-virements": {
-        "url": "http://localhost:8080",
+        "url": API_VIREMENTS_URL,
         "conteneur": "api",
         "log_group": "/atlas/api-virements",
     },
@@ -94,6 +103,11 @@ def etat_service(
         return {"erreur": f"service inconnu : {service}", "services_connus": list(SERVICES)}
     proc = subprocess.run(["docker", "inspect", svc["conteneur"]],
                           capture_output=True, text=True, timeout=10)
+    
+    
+    if PLATEFORME != "docker":
+        return {"service": service, "plateforme": PLATEFORME, "statut": "inconnu",
+                "detail": "état d'exécution non disponible sur cette plateforme (Kubernetes en phase 8)"}
     if proc.returncode != 0:
         return {"service": service, "statut": "introuvable", "detail": proc.stderr.strip()[:200]}
     info = json.loads(proc.stdout)[0]
@@ -157,7 +171,36 @@ def lire_logs_erreurs(
     resume["source"] = f"CloudWatch Logs Insights {svc['log_group']}"
     return resume
 
+@mcp.custom_route("/health", methods=["GET"])
+async def sante(request: Request) -> JSONResponse:
+    """Sonde de santé pour ECS. Jamais authentifiée, ne révèle rien."""
+    return JSONResponse({"status": "ok"})
+
+
+class JetonBearer:
+    """Middleware ASGI : refuse toute requête sans 'Authorization: Bearer <jeton>' (sauf /health)."""
+
+    def __init__(self, app, jeton: str):
+        self.app, self.attendu = app, f"Bearer {jeton}".encode()
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] != "/health":
+            recu = dict(scope["headers"]).get(b"authorization", b"")
+            if not hmac.compare_digest(recu, self.attendu):
+                await send({"type": "http.response.start", "status": 401,
+                            "headers": [(b"content-type", b"application/json")]})
+                await send({"type": "http.response.body", "body": b'{"erreur": "jeton invalide"}'})
+                return
+        await self.app(scope, receive, send)
+
 
 if __name__ == "__main__":
-    # 127.0.0.1 : joignable uniquement depuis l'EC2 elle-même. On exposera en phase 7, avec un jeton.
-    mcp.run(transport="streamable-http", host="127.0.0.1", port=8000)
+    if MCP_OPS_TOKEN:   # mode cloud : écoute sur toutes les interfaces, jeton obligatoire
+        import uvicorn
+        from mcp.server.transport_security import TransportSecuritySettings
+
+        app = mcp.streamable_http_app(
+            transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+        uvicorn.run(JetonBearer(app, MCP_OPS_TOKEN), host="0.0.0.0", port=8000)
+    else:               # mode local, comme avant
+        mcp.run(transport="streamable-http", host="127.0.0.1", port=8000)

@@ -11,6 +11,7 @@ dependencies = [
     "boto3>=1.43.122",
     "httpx>=0.28.1",
     "mcp[cli]>=2.3.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]

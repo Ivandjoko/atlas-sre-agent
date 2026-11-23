@@ -40,7 +40,7 @@ Catalogue des skills :
 
 
 # 2) Nouvelle version de creer_agent : identifiant de session et mode silencieux (pour les tests)
-def creer_agent(outils_mcp: list, silencieux: bool = False, session_id: str | None = None) -> Agent:
+def creer_agent(outils_mcp: list, silencieux: bool = False, session_id: str | None = None, note_systeme: str = "") -> Agent:
     model = BedrockModel(model_id=MODEL_ID, region_name="eu-central-1", temperature=0.2, max_tokens=4096)
     options = {
         "trace_attributes": {
